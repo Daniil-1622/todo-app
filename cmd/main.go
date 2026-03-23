@@ -5,10 +5,15 @@ import (
 
 	todo_app "github.com/Daniil-1622/todo-app"
 	"github.com/Daniil-1622/todo-app/pkg/handler"
+	"github.com/Daniil-1622/todo-app/pkg/repository"
+	"github.com/Daniil-1622/todo-app/pkg/service"
 )
 
 func main() {
-	handlers := new(handler.Handler)
+	repos := repository.NewRepository()
+	services := service.NewService(repos)
+	handlers := handler.NewHandler(services)
+
 	srv := new(todo_app.Server)                                    // Создаем новый экземпляр структуры Server
 	if err := srv.Run("8000", handlers.InitRoutes()); err != nil { // Запускаемся на порту 8000
 		// Если возникает ошибка, выводим ее

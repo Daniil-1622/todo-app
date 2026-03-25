@@ -1,7 +1,6 @@
 package main
 
 import (
-	"log"
 	"os"
 
 	todo_app "github.com/Daniil-1622/todo-app"
@@ -10,16 +9,18 @@ import (
 	"github.com/Daniil-1622/todo-app/pkg/service"
 	"github.com/joho/godotenv"
 	_ "github.com/lib/pq"
+	"github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
 )
 
 func main() {
+	logrus.SetFormatter(new(logrus.JSONFormatter))
 	if err := initConfig(); err != nil {
-		log.Fatalf("init config err: %s", err.Error())
+		logrus.Fatalf("init config err: %s", err.Error())
 	}
 
 	if err := godotenv.Load(); err != nil {
-		log.Fatalf("load .env file err: %s", err.Error())
+		logrus.Fatalf("load .env file err: %s", err.Error())
 	}
 
 	db, err := repository.NewPostgresDB(repository.Config{
@@ -31,7 +32,7 @@ func main() {
 		Password: os.Getenv("DB_PASSWORD"),
 	})
 	if err != nil {
-		log.Fatalf("failed to init db: %s", err.Error())
+		logrus.Fatalf("failed to init db: %s", err.Error())
 	}
 
 	repos := repository.NewRepository(db)
@@ -41,7 +42,7 @@ func main() {
 	srv := new(todo_app.Server)                                                     // Создаем новый экземпляр структуры Server
 	if err := srv.Run(viper.GetString("port"), handlers.InitRoutes()); err != nil { // Запускаемся на порту 8000
 		// Если возникает ошибка, выводим ее
-		log.Fatalf("error occured while running server: %s", err.Error())
+		logrus.Fatalf("error occured while running server: %s", err.Error())
 	}
 	/*
 			После добавления:

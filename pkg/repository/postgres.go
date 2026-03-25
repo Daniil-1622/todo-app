@@ -15,6 +15,14 @@ type Config struct {
 	SSLMode  string
 }
 
+const (
+	userTable       = "users"
+	todoListsTable  = "todo_lists"
+	userListsTable  = "user_lists"
+	todoItemsTable  = "todo_items"
+	listsItemsTable = "lists_items"
+)
+
 func NewPostgresDB(cfg Config) (*sqlx.DB, error) {
 	connStr := fmt.Sprintf("postgres://%s:%s@%s:%s/%s?sslmode=disable",
 		cfg.Username, cfg.Password, cfg.Host, cfg.Port, cfg.DBName)

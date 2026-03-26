@@ -5,4 +5,4 @@ db:
   host: "localhost"
   port: "5436"
   dbname: "postgres"
-  sslname: "disable"
+  sslmode: "disable"

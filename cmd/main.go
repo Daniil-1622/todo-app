@@ -1,7 +1,10 @@
 package main
 
 import (
+	"context"
 	"os"
+	"os/signal"
+	"syscall"
 
 	todo_app "github.com/Daniil-1622/todo-app"
 	"github.com/Daniil-1622/todo-app/pkg/handler"
@@ -39,10 +42,26 @@ func main() {
 	services := service.NewService(repos)
 	handlers := handler.NewHandler(services)
 
-	srv := new(todo_app.Server)                                                     // Создаем новый экземпляр структуры Server
-	if err := srv.Run(viper.GetString("port"), handlers.InitRoutes()); err != nil { // Запускаемся на порту 8000
-		// Если возникает ошибка, выводим ее
-		logrus.Fatalf("error occured while running server: %s", err.Error())
+	srv := new(todo_app.Server) // Создаем новый экземпляр структуры Server
+	go func() {
+		if err := srv.Run(viper.GetString("port"), handlers.InitRoutes()); err != nil { // Запускаемся на порту 8000
+			// Если возникает ошибка, выводим ее
+			logrus.Fatalf("error occured while running server: %s", err.Error())
+		}
+	}()
+
+	logrus.Print("TodoApp started")
+
+	quit := make(chan os.Signal, 1)
+	signal.Notify(quit, syscall.SIGTERM, syscall.SIGINT)
+	<-quit
+
+	logrus.Print("TodoApp stopped")
+	if err := srv.Shutdown(context.Background()); err != nil {
+		logrus.Errorf("error occured while shutting down: %s", err.Error())
+	}
+	if err := db.Close(); err != nil {
+		logrus.Errorf("error occured while closing db: %s", err.Error())
 	}
 	/*
 			После добавления:

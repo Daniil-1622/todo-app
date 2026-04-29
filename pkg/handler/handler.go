@@ -1,16 +1,18 @@
 package handler
 
 import (
+	"github.com/Daniil-1622/todo-app/pkg/kafka"
 	"github.com/Daniil-1622/todo-app/pkg/service"
 	"github.com/gin-gonic/gin"
 )
 
 type Handler struct {
 	services *service.Service
+	producer kafka.Producer
 }
 
-func NewHandler(services *service.Service) *Handler {
-	return &Handler{services: services}
+func NewHandler(services *service.Service, producer kafka.Producer) *Handler {
+	return &Handler{services: services, producer: producer}
 }
 
 func (h *Handler) InitRoutes() *gin.Engine {

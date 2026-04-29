@@ -7,7 +7,9 @@ import (
 	"syscall"
 
 	todo_app "github.com/Daniil-1622/todo-app"
+	"github.com/Daniil-1622/todo-app/pkg/events"
 	"github.com/Daniil-1622/todo-app/pkg/handler"
+	"github.com/Daniil-1622/todo-app/pkg/kafka"
 	"github.com/Daniil-1622/todo-app/pkg/repository"
 	"github.com/Daniil-1622/todo-app/pkg/service"
 	"github.com/joho/godotenv"
@@ -38,14 +40,50 @@ func main() {
 		logrus.Fatalf("failed to init db: %s", err.Error())
 	}
 
-	repos := repository.NewRepository(db)
-	services := service.NewService(repos)
-	handlers := handler.NewHandler(services)
+	// [НОВОЕ] Инициализация Kafka Producer
+	producer, err := kafka.NewProducer(
+		viper.GetStringSlice("kafka.brokers"),
+	)
+	if err != nil {
+		logrus.Fatalf("failed to init kafka producer: %s", err.Error())
+	}
 
-	srv := new(todo_app.Server) // Создаем новый экземпляр структуры Server
+	// [НОВОЕ] Инициализация Kafka Consumer
+	consumer, err := kafka.NewKafkaConsumer(
+		viper.GetStringSlice("kafka.brokers"),
+		viper.GetString("kafka.consumer.group_id"),
+	)
+	if err != nil {
+		logrus.Fatalf("failed to init kafka consumer: %s", err.Error())
+	}
+
+	// [НОВОЕ] Инициализация EventProcessor и запуск в горутине
+	processor := events.NewEventProcessor(
+		consumer,
+		events.NewTaskEventHandler(),
+		events.NewListEventHandler(),
+		events.NewUserEventHandler(),
+	)
+
+	topics := kafka.TopicsConfig{
+		TaskEvents: viper.GetString("kafka.topics.task_events"),
+		ListEvents: viper.GetString("kafka.topics.list_events"),
+		UserEvents: viper.GetString("kafka.topics.user_events"),
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	go processor.Start(ctx, topics)
+
+	// [ИЗМЕНЕНО] NewService теперь принимает producer
+	repos := repository.NewRepository(db)
+	services := service.NewService(repos, producer)
+
+	// [ИЗМЕНЕНО] NewHandler теперь принимает producer
+	handlers := handler.NewHandler(services, producer)
+
+	srv := new(todo_app.Server)
 	go func() {
-		if err := srv.Run(viper.GetString("port"), handlers.InitRoutes()); err != nil { // Запускаемся на порту 8000
-			// Если возникает ошибка, выводим ее
+		if err := srv.Run(viper.GetString("port"), handlers.InitRoutes()); err != nil {
 			logrus.Fatalf("error occured while running server: %s", err.Error())
 		}
 	}()
@@ -56,19 +94,30 @@ func main() {
 	signal.Notify(quit, syscall.SIGTERM, syscall.SIGINT)
 	<-quit
 
-	logrus.Print("TodoApp stopped")
+	logrus.Print("TodoApp stopping...")
+
+	// [НОВОЕ] Останавливаем EventProcessor через контекст
+	cancel()
+
 	if err := srv.Shutdown(context.Background()); err != nil {
-		logrus.Errorf("error occured while shutting down: %s", err.Error())
+		logrus.Errorf("error occured while shutting down server: %s", err.Error())
 	}
+
+	// [НОВОЕ] Закрываем Producer
+	if err := producer.Close(); err != nil {
+		logrus.Errorf("error occured while closing producer: %s", err.Error())
+	}
+
+	// [НОВОЕ] Закрываем Consumer
+	if err := consumer.Close(); err != nil {
+		logrus.Errorf("error occured while closing consumer: %s", err.Error())
+	}
+
 	if err := db.Close(); err != nil {
 		logrus.Errorf("error occured while closing db: %s", err.Error())
 	}
-	/*
-			После добавления:
-			handlers := new(handler.Handler)
-			srv.Run("8000", handlers.InitRoutes())
-		Сервер теперь знает что делать и по каким маршрутам двигаться!
-	*/
+
+	logrus.Print("TodoApp stopped")
 }
 
 func initConfig() error {

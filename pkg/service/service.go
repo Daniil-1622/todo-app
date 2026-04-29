@@ -2,6 +2,7 @@ package service
 
 import (
 	todo "github.com/Daniil-1622/todo-app"
+	"github.com/Daniil-1622/todo-app/pkg/kafka"
 	"github.com/Daniil-1622/todo-app/pkg/repository"
 )
 
@@ -33,10 +34,10 @@ type Service struct {
 	TodoItem
 }
 
-func NewService(repo *repository.Repository) *Service {
+func NewService(repo *repository.Repository, producer kafka.Producer) *Service {
 	return &Service{
 		Authorization: NewAuthService(repo),
-		TodoList:      NewTodoListService(repo.TodoList),
-		TodoItem:      NewTodoItemService(repo.TodoItem, repo.TodoList),
+		TodoList:      NewTodoListService(repo.TodoList, producer),
+		TodoItem:      NewTodoItemService(repo.TodoItem, repo.TodoList, producer),
 	}
 }
